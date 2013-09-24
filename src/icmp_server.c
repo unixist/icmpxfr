@@ -62,7 +62,7 @@ unsigned short checksum (unsigned short *addr, int len) {
 }
 
 void usage() {
-  fprintf(stderr, "Usage: ./bin [-f <filename>]\n");
+  fprintf(stderr, "Usage: ./bin [-hHrc] [-f filename]\n");
   exit(EXIT_SUCCESS);
 }
 
@@ -90,7 +90,7 @@ int main (int argc, char **argv) {
   struct icmp *icmp_hdr_in, *icmp_hdr_out;
 
   memset(&opts, 0, sizeof(options)); 
-  while ((opt = getopt(argc, argv, "hHcf:")) != -1) {
+  while ((opt = getopt(argc, argv, "hHrcf:")) != -1) {
     switch (opt) {
     case 'f':
       filename = optarg;
