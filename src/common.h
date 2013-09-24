@@ -8,6 +8,7 @@
 #define OPT_EXPECT_RESPONSE 64
 #define OPT_TRANSMIT_INTERVAL 128
 #define OPT_LIKE_PING 256
+#define OPT_PAYLOAD_LENGTH 512
 
 struct options {
   unsigned long long flags;

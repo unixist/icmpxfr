@@ -37,7 +37,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "common.h"
 
 void usage() {
-  fprintf(stderr, "Usage: ./bin [-hre] [-d ip] [-f filename] [-i interval] [-s source]\n");
+  fprintf(stderr, "Usage: ./bin [-hre] [-l packet length] [-d ip] [-f filename] [-i interval] [-s source]\n");
   exit(EXIT_SUCCESS);
 }
 
@@ -49,7 +49,7 @@ int main (int argc, char **argv) {
   char buf_outgoing[1500];
   char started = 0;
   char done = 0;
-  unsigned char payload[50];
+  unsigned char *payload;
   unsigned char *whole_file;
   unsigned char sha1_hash[20];
   struct options opts;
@@ -65,13 +65,14 @@ int main (int argc, char **argv) {
   int ip_len;
   int icmp_len;
   int opt = 0;
-  int transmit_interval = 30000;
+  int transmit_interval = 0;
+  unsigned int max_payload_len = 56;
   unsigned const int WHOLE_FILE_LEN = 4096;
   unsigned long long pos = 0;
   unsigned long long whole_file_len = 0;
   u_short payload_len;
 
-  while ((opt = getopt(argc, argv, "hred:f:i:s:")) != -1) {
+  while ((opt = getopt(argc, argv, "hrel:d:f:i:s:")) != -1) {
     switch (opt) {
     case 'f':
       opts.flags |= OPT_FILENAME;
@@ -91,11 +92,17 @@ int main (int argc, char **argv) {
     case 'r':
       opts.flags |= OPT_EXPECT_RESPONSE;
       break;
+    case 'l':
+      opts.flags |= OPT_PAYLOAD_LENGTH;
+      max_payload_len = strtoul(optarg, NULL, 10);
+      break;
     case 'i':
       opts.flags |= OPT_TRANSMIT_INTERVAL;
       transmit_interval = strtoul(optarg, NULL, 10);
       if (transmit_interval > 0)
         transmit_interval = transmit_interval * 1000000;
+      else
+        transmit_interval = 30000;
       break;
     case 'p':
       opts.flags |= OPT_LIKE_PING;
@@ -150,13 +157,14 @@ int main (int argc, char **argv) {
   ip_hdr_out = (struct ip *) buf_outgoing;
   icmp_hdr_out = (struct icmp *) (buf_outgoing + sizeof (struct ip));
 
+  payload = malloc(max_payload_len);
   memset(whole_file, 0, WHOLE_FILE_LEN);
   do { 
     if (opts.flags & OPT_EXPECT_RESPONSE && started) {
       ret = recv(sock_eth, buf_incoming, sizeof (buf_incoming), 0);
     }
-    memset(payload, 0, sizeof(payload));
-    if ((ret = read(fd, payload, sizeof(payload))) == -1) {
+    memset(payload, 0, max_payload_len);
+    if ((ret = read(fd, payload, max_payload_len)) == -1) {
       perror("read");
       exit(1);
     }
