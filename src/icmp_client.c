@@ -48,8 +48,6 @@ int main (int argc, char **argv) {
   char buf_incoming[1500];
   char buf_outgoing[1500];
   char started = 0;
-  char exec_mode = 0;
-  char expect_response = 0;
   char done = 0;
   unsigned char payload[50];
   unsigned char *whole_file;
@@ -92,7 +90,6 @@ int main (int argc, char **argv) {
       break;
     case 'r':
       opts.flags |= OPT_EXPECT_RESPONSE;
-      expect_response = 1;
       break;
     case 'i':
       opts.flags |= OPT_TRANSMIT_INTERVAL;
@@ -108,7 +105,8 @@ int main (int argc, char **argv) {
       usage();
     }
   }
-  if (!dst_ip || (!filename && !exec_mode)) {
+
+  if (!(opts.flags & OPT_DST_IP) || (!(opts.flags & OPT_FILENAME) && !(opts.flags & OPT_EXEC_MODE))) {
     usage();
   }
 
@@ -129,8 +127,8 @@ int main (int argc, char **argv) {
     exit(1);
   }
 
-  if (!exec_mode) {
-    if (filename) {
+  if (!(opts.flags & OPT_EXEC_MODE)) {
+    if (opts.flags & OPT_FILENAME && filename) {
       if ((fd = open(filename, O_RDONLY)) == -1) {
         perror("open");
         exit(1);
@@ -154,7 +152,7 @@ int main (int argc, char **argv) {
 
   memset(whole_file, 0, WHOLE_FILE_LEN);
   do { 
-    if (expect_response && started) {
+    if (opts.flags & OPT_EXPECT_RESPONSE && started) {
       ret = recv(sock_eth, buf_incoming, sizeof (buf_incoming), 0);
     }
     memset(payload, 0, sizeof(payload));
