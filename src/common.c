@@ -54,7 +54,7 @@ void fill_icmp_packet(struct icmp *pkt, u_int16_t id, unsigned const char *paylo
     pkt->icmp_seq++;
   else
     pkt->icmp_seq = 0;
-  memcpy (pkt->icmp_data, payload, payload_len);
+  memcpy(pkt->icmp_data, payload, payload_len);
   pkt->icmp_cksum = 0;
   pkt->icmp_cksum = checksum((unsigned short *) pkt, icmp_len);
 }
