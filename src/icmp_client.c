@@ -20,6 +20,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -33,58 +34,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <netinet/ether.h>
 #include <openssl/sha.h>
 
-unsigned short checksum (unsigned short *addr, int len) {
-  int nleft = len;
-  int sum = 0;
-  unsigned short *w = addr;
-  unsigned short answer = 0;
-  while (nleft > 1) {
-    sum += *w++;
-    nleft -= 2;
-  }
-  if (nleft == 1) {
-    *(unsigned char *) (&answer) = *(unsigned char *) w;
-    sum += answer;
-  }
-  sum = (sum >> 16) + (sum & 0xffff);
-  sum += (sum >> 16);
-  answer = ~sum;
-  return (answer);
-}
-
-void fill_ip_packet(struct ip *pkt, u_short data_len, const char *src, const char *dst) {
-  struct in_addr addr;
-  inet_pton(AF_INET, dst, &addr);
-  pkt->ip_v = 4;
-  pkt->ip_hl = 5;
-  pkt->ip_tos = 0;
-  pkt->ip_len = htons(sizeof(struct ip) + sizeof(struct icmphdr) + data_len);
-  pkt->ip_id = 9;
-  pkt->ip_off = 0;
-  pkt->ip_ttl = 255;
-  pkt->ip_p = IPPROTO_ICMP;
-  pkt->ip_src.s_addr = inet_addr(src == NULL ? "1.3.3.7" : src);
-  pkt->ip_src.s_addr = htonl(INADDR_ANY);
-  pkt->ip_dst.s_addr = addr.s_addr;
-  pkt->ip_sum = 0;
-  pkt->ip_sum = checksum((unsigned short *) pkt, sizeof(struct ip));
-}
-
-void fill_icmp_packet(struct icmp *pkt, u_int16_t id, unsigned const char *payload, size_t payload_len, size_t icmp_len) {
-  pkt->icmp_type = ICMP_ECHO;
-  pkt->icmp_code = 0;
-  pkt->icmp_id = id;
-  if (pkt->icmp_seq)
-    pkt->icmp_seq++;
-  else
-    pkt->icmp_seq = 0;
-  memcpy (pkt->icmp_data, payload, payload_len);
-  pkt->icmp_cksum = 0;
-  pkt->icmp_cksum = checksum((unsigned short *) pkt, icmp_len);
-}
+#include "common.h"
 
 void usage() {
-  fprintf(stderr, "Usage: ./bin [-hrc] [-d ip] [-f filename] [-i interval] [-s source]\n");
+  fprintf(stderr, "Usage: ./bin [-hre] [-d ip] [-f filename] [-i interval] [-s source]\n");
   exit(EXIT_SUCCESS);
 }
 
@@ -97,14 +50,15 @@ int main (int argc, char **argv) {
   char started = 0;
   char exec_mode = 0;
   char expect_response = 0;
+  char done = 0;
   unsigned char payload[50];
   unsigned char *whole_file;
   unsigned char sha1_hash[20];
+  struct options opts;
   struct sockaddr_in dst;
   struct ether_header *eth_hdr;
   struct ip *ip_hdr_in, *ip_hdr_out;
   struct icmp *icmp_hdr_in, *icmp_hdr_out;
-  int done = 0;
   int one = 1;
   int ret = 0;
   int fd;
@@ -119,26 +73,35 @@ int main (int argc, char **argv) {
   unsigned long long whole_file_len = 0;
   u_short payload_len;
 
-  while ((opt = getopt(argc, argv, "hrcd:f:i:s:")) != -1) {
+  while ((opt = getopt(argc, argv, "hred:f:i:s:")) != -1) {
     switch (opt) {
     case 'f':
+      opts.flags |= OPT_FILENAME;
       filename = optarg;
       break;
-    case 'c':
-      exec_mode = 1;
+    case 'e':
+      opts.flags |= OPT_EXEC_MODE;
       break;
     case 'd':
+      opts.flags |= OPT_DST_IP;
       dst_ip = optarg;
       break;
     case 's':
+      opts.flags |= OPT_SRC_IP;
       src_ip = optarg;
       break;
     case 'r':
+      opts.flags |= OPT_EXPECT_RESPONSE;
       expect_response = 1;
       break;
     case 'i':
-      transmit_interval = atoi(optarg);
-      printf("interval=%d\n", transmit_interval);
+      opts.flags |= OPT_TRANSMIT_INTERVAL;
+      transmit_interval = strtoul(optarg, NULL, 10);
+      if (transmit_interval > 0)
+        transmit_interval = transmit_interval * 1000000;
+      break;
+    case 'p':
+      opts.flags |= OPT_LIKE_PING;
       break;
     case 'h':
     default:
@@ -172,7 +135,7 @@ int main (int argc, char **argv) {
         perror("open");
         exit(1);
       }
-    }else{
+    } else{
       fd = STDIN_FILENO;
     }
   }
@@ -199,16 +162,16 @@ int main (int argc, char **argv) {
       perror("read");
       exit(1);
     }
-    if (ret == 0) {// End of file, send payload-end delimiter '.'
+    if (ret == 0) {// End of file, send payload-end delimiter '\0'
       payload[0] = '\0';
       payload_len = 0;
       done = 1;
-    }else{// Gather next bit of file
+    } else {// Gather next bit of file
       payload_len = ret;
       if (pos + payload_len > WHOLE_FILE_LEN) {
         whole_file = realloc(whole_file, WHOLE_FILE_LEN + pos + payload_len);
         whole_file_len = pos + payload_len;
-      }else{
+      } else {
         whole_file_len += payload_len;
       }
       memcpy(whole_file + pos, payload, payload_len);

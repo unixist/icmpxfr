@@ -32,37 +32,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <netinet/ip_icmp.h>
 #include <netinet/ether.h>
 
-#define OPT_HELP 1
-#define OPT_EXEC_MODE 2
-#define OPT_FILENAME 4
-#define OPT_RESPOND_TO_CLIENT 8
-#define OPT_OUTPUT_HASH 16
-
-struct options {
-  unsigned long long flags;
-} options;
-
-unsigned short checksum (unsigned short *addr, int len) {
-  int nleft = len;
-  int sum = 0;
-  unsigned short *w = addr;
-  unsigned short answer = 0;
-  while (nleft > 1) {
-    sum += *w++;
-    nleft -= 2;
-  }
-  if (nleft == 1) {
-    *(unsigned char *) (&answer) = *(unsigned char *) w;
-    sum += answer;
-  }
-  sum = (sum >> 16) + (sum & 0xffff);
-  sum += (sum >> 16);
-  answer = ~sum;
-  return (answer);
-}
+#include "common.h"
 
 void usage() {
-  fprintf(stderr, "Usage: ./bin [-hHrc] [-f filename]\n");
+  fprintf(stderr, "Usage: ./bin [-hHre] [-f filename]\n");
   exit(EXIT_SUCCESS);
 }
 
@@ -90,13 +63,13 @@ int main (int argc, char **argv) {
   struct icmp *icmp_hdr_in, *icmp_hdr_out;
 
   memset(&opts, 0, sizeof(options)); 
-  while ((opt = getopt(argc, argv, "hHrcf:")) != -1) {
+  while ((opt = getopt(argc, argv, "hHref:")) != -1) {
     switch (opt) {
     case 'f':
       filename = optarg;
       opts.flags |= OPT_FILENAME;
       break;
-    case 'c':
+    case 'e':
       exec_mode = 1;
       opts.flags |= OPT_EXEC_MODE;
       break;
@@ -149,6 +122,7 @@ int main (int argc, char **argv) {
        icmp_hdr_out->icmp_type = ICMP_ECHOREPLY;
        icmp_hdr_out->icmp_code = 0;
       if (icmp_hdr_in->icmp_type == ICMP_ECHO) {
+        //TODO: use fill_* functions
         ip_hdr_out->ip_v = ip_hdr_in->ip_v;
         ip_hdr_out->ip_hl = ip_hdr_in->ip_hl;
         ip_hdr_out->ip_tos = ip_hdr_in->ip_tos;
