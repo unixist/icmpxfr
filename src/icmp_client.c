@@ -37,7 +37,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "common.h"
 
 void usage() {
-  fprintf(stderr, "Usage: ./bin [-hre] [-d ip] [-f filename] [-i interval] [-s source]\n");
+  fprintf(stderr, "Usage: ./bin [-hre] [-d dest ip] [-s source IP] [-f filename] [-i interval]\n");
   exit(EXIT_SUCCESS);
 }
 
@@ -71,7 +71,7 @@ int main (int argc, char **argv) {
   unsigned long long whole_file_len = 0;
   u_short payload_len;
 
-  while ((opt = getopt(argc, argv, "hred:f:i:s:")) != -1) {
+  while ((opt = getopt(argc, argv, "hred:s:f:i:")) != -1) {
     switch (opt) {
     case 'f':
       opts.flags |= OPT_FILENAME;

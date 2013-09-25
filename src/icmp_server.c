@@ -35,7 +35,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "common.h"
 
 void usage() {
-  fprintf(stderr, "Usage: ./bin [-hHre] [-f filename]\n");
+  fprintf(stderr, "Usage: ./bin [-hHre] [-s source IP] [-f filename] \n");
   exit(EXIT_SUCCESS);
 }
 
@@ -51,11 +51,12 @@ int main (int argc, char **argv) {
   int icmp_data_in_len;
   int opt = 0;
   char *filename = NULL;
+  char *src_ip = NULL;
   unsigned char sha1hash[20];
   char buf_incoming[1500];
   char buf_outgoing[1500];
   char payload[50];
-  char exec_mode = 0;
+  char done = 0;
   struct options opts;
   struct sockaddr_in dst;
   struct ether_header *eth_hdr;
@@ -63,18 +64,21 @@ int main (int argc, char **argv) {
   struct icmp *icmp_hdr_in, *icmp_hdr_out;
 
   memset(&opts, 0, sizeof(options)); 
-  while ((opt = getopt(argc, argv, "hHref:")) != -1) {
+  while ((opt = getopt(argc, argv, "hHres:f:")) != -1) {
     switch (opt) {
     case 'f':
       filename = optarg;
       opts.flags |= OPT_FILENAME;
       break;
     case 'e':
-      exec_mode = 1;
       opts.flags |= OPT_EXEC_MODE;
       break;
     case 'r':
       opts.flags |= OPT_RESPOND_TO_CLIENT;
+      break;
+    case 's':
+      opts.flags |= OPT_SRC_IP;
+      src_ip = optarg;
       break;
     case 'H':
       opts.flags |= OPT_OUTPUT_HASH;
@@ -118,11 +122,25 @@ int main (int argc, char **argv) {
   icmp_hdr_out = (struct icmp *) (buf_outgoing + sizeof (struct ip));
 
   while ((ret = recv (sock_eth, buf_incoming, sizeof (buf_incoming), 0)) > 0) {
+    // If we specified a source IP on the command line, disregard the packet if it's not from that source
+    if (opts.flags & OPT_SRC_IP && src_ip && strcmp(src_ip, inet_ntoa(ip_hdr_in->ip_src)))
+      continue;
     if (ip_hdr_in->ip_p == IPPROTO_ICMP) {
-       icmp_hdr_out->icmp_type = ICMP_ECHOREPLY;
-       icmp_hdr_out->icmp_code = 0;
       if (icmp_hdr_in->icmp_type == ICMP_ECHO) {
-        //TODO: use fill_* functions
+        if (done) {
+          memset(sha1hash, 0, sizeof(sha1hash));
+          memcpy(sha1hash, icmp_hdr_in->icmp_data, sizeof(sha1hash));
+          if (opts.flags & OPT_OUTPUT_HASH) {
+            for (; i < sizeof(sha1hash); i++)
+              fprintf(stderr, "%02x", sha1hash[i]);
+            fprintf(stderr, "\n");
+          }
+          break;
+        }
+        icmp_hdr_out->icmp_type = ICMP_ECHOREPLY;
+        icmp_hdr_out->icmp_code = 0;
+
+        //TODO: use fill_* functions from common.c
         ip_hdr_out->ip_v = ip_hdr_in->ip_v;
         ip_hdr_out->ip_hl = ip_hdr_in->ip_hl;
         ip_hdr_out->ip_tos = ip_hdr_in->ip_tos;
@@ -148,12 +166,11 @@ int main (int argc, char **argv) {
         
         memset(payload, 0, sizeof(payload));
         memcpy(payload, icmp_hdr_in->icmp_data, icmp_data_in_len);
-        // TODO: change this crappy protocol that determines conversation termination this way
         if (payload[0] == '\0' && icmp_data_in_len == 0) {
-          break;
+          done = 1;
+          continue;
         }
         write(fd, payload, icmp_data_in_len);
-
         if (opts.flags & OPT_RESPOND_TO_CLIENT) {
           memcpy(icmp_hdr_out->icmp_data, payload, icmp_data_in_len);
           dst.sin_family = AF_INET;
@@ -168,14 +185,7 @@ int main (int argc, char **argv) {
       }
     }
   }
-  memset(sha1hash, 0, sizeof(sha1hash));
-  ret = recv(sock_eth, buf_incoming, sizeof(buf_incoming), 0);
-  memcpy(sha1hash, icmp_hdr_in->icmp_data, sizeof(sha1hash));
-  if (opts.flags & OPT_OUTPUT_HASH) {
-    for (; i < sizeof(sha1hash); i++)
-      fprintf(stderr, "%02x", sha1hash[i]);
-    fprintf(stderr, "\n");
-  }
+
   close(fd);
   close(sock_eth);
   close(sock_icmp);
