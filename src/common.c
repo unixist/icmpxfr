@@ -51,7 +51,7 @@ void fill_icmp_packet(struct icmp *pkt, u_int16_t id, unsigned const char *paylo
   pkt->icmp_code = 0;
   pkt->icmp_id = id;
   if (pkt->icmp_seq)
-    pkt->icmp_seq++;
+    pkt->icmp_seq = htons(ntohs(pkt->icmp_seq)+1);
   else
     pkt->icmp_seq = 0;
   memcpy(pkt->icmp_data, payload, payload_len);
