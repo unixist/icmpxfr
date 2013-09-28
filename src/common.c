@@ -49,7 +49,7 @@ void fill_ip_packet(struct ip *pkt, u_short data_len, const char *src, const cha
 void fill_icmp_packet(struct icmp *pkt, u_int16_t id, unsigned const char *payload, size_t payload_len, size_t icmp_len) {
   pkt->icmp_type = ICMP_ECHO;
   pkt->icmp_code = 0;
-  pkt->icmp_id = id;
+  pkt->icmp_id = 0;
   if (pkt->icmp_seq)
     pkt->icmp_seq = htons(ntohs(pkt->icmp_seq)+1);
   else
