@@ -156,8 +156,8 @@ int main (int argc, char **argv) {
 
         icmp_hdr_out->icmp_type = ICMP_ECHOREPLY;
         icmp_hdr_out->icmp_code = 0;
-        icmp_hdr_out->icmp_id = icmp_hdr_in->icmp_id;
-        icmp_hdr_out->icmp_seq = icmp_hdr_in->icmp_seq + 1;
+        icmp_hdr_out->icmp_id = 0;
+        icmp_hdr_out->icmp_seq = icmp_hdr_in->icmp_seq;
         icmp_hdr_out->icmp_cksum = 0;
 
         ip_len = ntohs (ip_hdr_in->ip_len);
