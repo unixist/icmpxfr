@@ -191,9 +191,9 @@ int main (int argc, char **argv) {
 
     dst.sin_family = AF_INET;
     dst.sin_addr.s_addr = ip_hdr_out->ip_dst.s_addr;
-    usleep(transmit_interval); //ICMP is too fast!
+    
     if (!started) started = 1;
-  }while ((ret = sendto(sock_icmp, buf_outgoing, ip_len, 0, (struct sockaddr *) &dst, sizeof (dst)) != -1) && !done);
+  }while ((ret = sendto(sock_icmp, buf_outgoing, ip_len, 0, (struct sockaddr *) &dst, sizeof (dst)) != -1) && !done && usleep(transmit_interval) == 0);
 
   // Calc and send the SHA1 file hash
   SHA1(whole_file, whole_file_len, sha1_hash);

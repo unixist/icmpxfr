@@ -37,10 +37,9 @@ void fill_ip_packet(struct ip *pkt, u_short data_len, const char *src, const cha
   pkt->ip_len = htons(sizeof(struct ip) + sizeof(struct icmphdr) + data_len);
   pkt->ip_id = 9;
   pkt->ip_off = 0;
-  pkt->ip_ttl = 255;
+  pkt->ip_ttl = 128;
   pkt->ip_p = IPPROTO_ICMP;
   pkt->ip_src.s_addr = inet_addr(src == NULL ? "1.3.3.7" : src);
-  pkt->ip_src.s_addr = htonl(INADDR_ANY);
   pkt->ip_dst.s_addr = addr.s_addr;
   pkt->ip_sum = 0;
   pkt->ip_sum = checksum((unsigned short *) pkt, sizeof(struct ip));
